@@ -122,12 +122,12 @@ identifySnpsIndels<-function(qtl_region_interest,chr,analysis_name) {
 
         tabix_snps<-createTabixFile("ftp://ftp-mouse.sanger.ac.uk/REL-1505-SNPs_Indels/mgp.v5.merged.indels.dbSNP142.normed.vcf.gz",chr_min_max,filters,"snps")
         write(tabix_snps,file=file.path(outputdir,paste0(analysis_name,"_snps.txt")))
-        system(paste0("chmod 777 ",file.path(outputdir,paste0(analysis_name,"_snps.txt"))), intern=T)
+        system(paste0("chmod u+x ",file.path(outputdir,paste0(analysis_name,"_snps.txt"))), intern=T)
         system(file.path(outputdir,paste0(analysis_name,"_snps.txt")),intern=T)
 
         tabix_indels<-createTabixFile("ftp://ftp-mouse.sanger.ac.uk/REL-1505-SNPs_Indels/mgp.v5.merged.indels.dbSNP142.normed.vcf.gz", chr_min_max,filters,"indels")
         write(tabix_indels,file=file.path(outputdir,paste0(analysis_name,"_indels.txt")))
-        system(paste0("chmod 777 ",file.path(outputdir,paste0(analysis_name,"_indels.txt"))), intern=T)
+        system(paste0("chmod u+x ",file.path(outputdir,paste0(analysis_name,"_indels.txt"))), intern=T)
         system(file.path(outputdir,paste0(analysis_name,"_indels.txt")),intern=T)
 
         tabix_files<-list.files(path=outputdir,pattern=paste0(chr_min_max[1,1],"_",chr_min_max[1,2],"_",chr_min_max[1,3],"_[indels|snps]"),full.names=T)
