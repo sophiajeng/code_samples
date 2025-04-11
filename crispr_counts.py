@@ -3,31 +3,39 @@ import sys
 import os
 from collections import defaultdict
 
-#key is sequence
-def create_library_dict(filename=None,length_dict=None,dup_seqs=None,flagged_seq=None):
+#program to process trimmed fastq files from Crispr experuments
+#command line files inputs: trimmed fastq file and sgRNA librart
+#command line string inputs: string for sample alignment statistics file (for output), 
+#	string for sample counts file (for output),
+#	string for trimmed counts file (for output)
+#	string for sequence counts file (for output)
+
+#create a dictionary with: key is sequence, value is array with guide name, sequence, and gene name
+#file name is the comma delimited file with guidename, sequence, gene name
+#length_dict is empty as input then populated
+#dupe_seq is empty as input then populated
+def create_library_dict(filename=None,length_dict=None,dupe_seq=None):
   d={}
   seq_array=[]
   with open(filename) as f:
     for line in f:
       sgrna = line.split(",")
-      seq_array.append(sgrna[1])
+      #add sgrna sequence
+      if sgrna[1] in seq_array:
+        if sgrna[1] not in dup_seq:
+          dupe_seq.append(sgrna[1])
+      else:
+        seq_array.append(sgrna[1])
+      #add length of sequence to sequence length dict
       seq_length=len(sgrna[1])
       length_dict.update({seq_length:0})
       d[sgrna[1]]= sgrna
-  #dup_seqs=dup_seq(seq_array)
-  #flagged_seq=check_seq(seq_array)
   return d
 
 
-def check_seq(sequence_array=None):
-  seq_score=[]
-  for i in sequence_array:
-    #print(i)
-    max_sim_score=calculate_seq_score(i,[x for x in sequence_array if x not in i])
-    seq_score.append(max_sim_score)
-  return seq_score
-
-#key is read name
+#input is a trimmed fastq file
+#input_dict key is sequence of sgRNA, value is a list with guide  name, sequence, gene target
+#output is list with #unmapped reads, #reads, #multimapped reads, #reads with wrong length
 def process_fastq(filename=None,input_dict=None,n=0,seq_length_counter=None,dup_seq=None):
   unmappedreads=0
   numreads=0
@@ -53,6 +61,7 @@ def process_fastq(filename=None,input_dict=None,n=0,seq_length_counter=None,dup_
         lines=[]
   return [unmappedreads,numreads,nummulti,num_wronglength]
 
+#setting and checking for command line arguments
 try:
     fastq = sys.argv[1]
 except IndexError as ie:
@@ -83,20 +92,21 @@ except IndexError as ie:
 
 
 #number of lines for a fastq file
-#consider if fastq has funny business
 record_lines = 4
-#sample_reads =  process_fastq(fastq)
 reads_length_dict={}
-dupe_sgnra_seq=()
+dupe_sgrna_seq=[]
 sgrna_sim_dict={}
-sgrna_dict=create_library_dict(lib_file,reads_length_dict,dupe_sgnra_seq,sgrna_sim_dict)
+#create a dictionary with all the guide sequences based on input file lib_file
+#populate reads_length_dict, dupe_sgrna_seq, sgrna_sim_dict
+sgrna_dict=create_library_dict(lib_file,reads_length_dict,dupe_sgrna_seq)
 sgrna_seq = list(sgrna_dict.keys())
 sample_dict = {key: 0 for key in sgrna_seq}
 
-reads_summary=process_fastq(fastq,sample_dict,record_lines,reads_length_dict,dupe_sgnra_seq)
+reads_summary=process_fastq(fastq,sample_dict,record_lines,reads_length_dict,dupe_sgrna_seq)
 
 #output_filename=fastq[0:fastq.index('.')]
 
+#write out alignment statistics
 with open(statistics_outfile, 'w') as f:
     f.write('Number of processed reads\tNumber of unmapped reads\tNumber of multimapped reads')
     seq_lens=reads_length_dict.keys()
@@ -109,10 +119,10 @@ with open(statistics_outfile, 'w') as f:
     f.write('\t'+str(reads_summary[3])+'\n')
 f.close()
 
-ds = [sgrna_dict, sample_dict,sgrna_sim_dict]
+ds = [sgrna_dict, sample_dict]
 sample_counter = defaultdict(list)
 
-for d in (sgrna_dict,sample_dict,sgrna_sim_dict): 
+for d in (sgrna_dict,sample_dict): 
     for key, value in d.items():
         sample_counter[key].append(value)
 
