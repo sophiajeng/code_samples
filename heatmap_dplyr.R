@@ -6,35 +6,25 @@ library(circlize)
 rda_dir<-"/Users/jengs/OneDrive - Oregon Health & Science University/From_Box/Pre-Share/PPG/cluster_specific_analysis/rda"
 adata<-read_h5ad("/Users/jengs/OneDrive - Oregon Health & Science University/From_Box/Pre-Share/PPG/cluster_specific_analysis/h5ad_files/harmony_cmv_clusters_refined_04042025.h5ad")
 #get unique clusters and samples
-bc_leiden_batch<-adata$obs %>% rownames_to_column() %>% group_by(leiden,batch) %>% select(rowname,leiden,batch) %>% group_split()
+bc_leiden_batch<-adata$obs %>% rownames_to_column() %>% select(rowname,leiden,batch) %>% group_by(leiden,batch) %>% group_split()
 
-
-#create a list of clusters
-#each element will be a list of batch
-#each element of batch will be a list of samples/barcodes for that batch in that cluster
 
 #subset X with just hcmv genes
-gtf<-read.delim("/Users/jengs/OneDrive - Oregon Health & Science University/From_Box/Pre-Share/PPG/scRNA_20250128/genomes/genes_sorted.gtf",stringsAsFactors=F,header=F)
-
-hcmv_gtf<-gtf[which(gtf[,"V2"]=="Geneious"),]
-hcmv_gene<-gsub(";.*","",gsub("gene_id ","",hcmv_gtf[,"V9"]))
-hcmv_gtf[,"gene"]<-hcmv_gene
-hcmv_gene_unique<-hcmv_gtf[!duplicated(hcmv_gtf[,"gene"]),"gene"]
+gtf<-read_delim("/Users/jengs/OneDrive - Oregon Health & Science University/From_Box/Pre-Share/PPG/scRNA_20250128/genomes/genes_sorted.gtf",delim="\t",col_names=F,quote="")
+hcmv_gtf<-gtf %>% filter(X2=="Geneious")
+hcmv_gene<-hcmv_gtf %>% select(X9) %>% mutate(gene=gsub("\"","",gsub(";.*","",gsub("gene_id ","",X9)))) %>% select(gene) %>% distinct() %>% pull(gene)
 #what is not in the exprset
-setdiff(hcmv_gene_unique,rownames(adata$var))
+setdiff(hcmv_gene,rownames(adata$var))
 #[1] "US34A"               "AmpR\\(B-Lactamase)" "UL2"                
 #[4] "UL19"                "UL48A"               "UL80.5"             
 #[7] "UL147A"             
-hcmv_idx<-which(rownames(adata$var) %in% hcmv_gene_unique)
-
+hcmv_idx<-which(rownames(adata$var) %in% hcmv_gene)
 #subset counts
 hcmv_X<-adata$X[,hcmv_idx]
 
-#get the mean for each hcmv gene
-#by batch and leiden
 get_hcmv_mean<-function(bc_df,expr) {
-	bcs<-pull(bc_df,rowname)
-	leiden<-bc_df %>% select(leiden) %>% distinct()
+	bcs<-bc_df %>% pull(rowname)
+	leiden<-bc_df %>% select(leiden) %>% distinct() 
 	batch<-bc_df %>% select(batch) %>% distinct()
 	if (length(bcs) > 1) {
          	cluster_batch_mean<-Matrix::colMeans(expr[bcs,])
@@ -43,6 +33,9 @@ get_hcmv_mean<-function(bc_df,expr) {
 }
 
 cluster_matrix_list<-map(bc_leiden_batch,get_hcmv_mean,hcmv_X)
+#create a wider tibble
+#cols are genes
+#row batch/leiden
 create_wider_tibble<-function(long_t) {
 	if (!is.null(long_t)) {
         	wider_t<-long_t %>% rownames_to_column(var="gene") %>% pivot_wider(id_cols=c(batch,leiden),names_from=gene,values_from=cluster_batch_mean)
@@ -52,17 +45,17 @@ create_wider_tibble<-function(long_t) {
 }
 cluster_row<-map(cluster_matrix_list,create_wider_tibble)
 cluster_matrix<-do.call(rbind,cluster_row)
-hcmv_mean_cluster_list<-cluster_matrix %>% group_by(leiden) 
+hcmv_mean_cluster_list<-cluster_matrix %>% group_by(leiden) %>% group_split()
 
 #create a heatmap, do not cluster batch/gene for easy comparison
 #create consistent color gradient
 col_fun = colorRamp2(c(0, 3, 6), c("grey", "blue", "red"))
 col_fun(seq(-3, 3))
-hcmv_gene_order<-hcmv_gene_unique[which(hcmv_gene_unique %in% rownames(adata$var))]
+hcmv_gene_order<-hcmv_gene[which(hcmv_gene %in% rownames(adata$var))]
 dir<-"/Users/jengs/OneDrive - Oregon Health & Science University/From_Box/Pre-Share/PPG/cluster_specific_analysis/heatmaps_dplyr"
 
 create_hm<-function(cluster_tibble,outputdir,gene_order,col_ramp) {
-	leiden<-cluster_tibble %>% select(leiden) %>% distinct() %>% pull(leiden)
+	leiden<-cluster_tibble %>% mutate(across(where(is.factor), as.character)) %>% select(leiden) %>% distinct()
 	print(as.character(leiden))
 	cluster_df<-cluster_tibble %>% column_to_rownames(var="batch") %>% select(!(leiden))
 	cluster_matrix<-as.matrix(cluster_df)
