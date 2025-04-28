@@ -1,0 +1,68 @@
+
+--generate a report listing track names alongside their unit prices
+SELECT 
+    name as "Track Name", 
+    unitprice as Price
+FROM Track as t
+order by name
+limit 20;
+-- Write a SQL query that selects track names, composers, and unit prices
+-- and categorize each track based on its price
+SELECT 
+    t.name as "Track Name",
+    t.composer,
+    t.unitprice as Price,
+    case
+    when t.unitprice <= 0.99 then 'Budget'
+    when t.unitprice between 1.00 and 1.49 then 'Regular'
+    when t.unitprice between 1.50 and 1.99 then 'Premium'
+    else 'Exclusive'
+    end as PriceCategory
+FROM Track as t
+order by unitprice asc;
+-- Write a SQL query to generate a report that lists each customer along
+-- with their assigned support representative
+SELECT 
+    c.firstname as CustomerFirstName,
+    c.lastname as CustomerLastName,
+    e.firstname as SupportRepFirstName,
+    e.lastname as SupportRepLastName
+FROM Customer as c
+inner join
+    employee as e
+    on
+    c.supportrepid=e.employeeid
+order by
+    e.lastname, c.lastname
+;
+-- Write a SQL query that selects the customer full name and transforms 
+-- their postalcode into a standardized five digit format
+SELECT
+    c.firstname || ' ' ||c.lastname as CustomerFullName,
+    substr(c.postalcode,1,5) as StandardizedPostalCode
+FROM Customer as c
+where c.country='USA'
+order by customerfullname;
+--Create a SQL report that calculates averag spending amount of customers in each City
+SELECT 
+i.billingcity as City, 
+round(avg(i.total),2) as AverageSpending
+FROM Invoice as i
+group by
+    i.billingcity
+order by 
+    i.billingcity
+;
+
+-- Write a SQL query that identifies tracks that have never been sold
+SELECT 
+    t.trackid as "Track ID",
+    t.name as "Track Name",
+    t.composer as COMPOSER,
+    g.name as GENRE
+FROM Track as t
+inner join genre as g on
+t.GENREID=g.genreid
+where t.trackid not in
+(select distinct(li.trackid) from invoiceline as li)
+order by t.name asc;
